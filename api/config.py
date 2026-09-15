@@ -1126,6 +1126,35 @@ def _resolve_cli_toolsets(cfg=None):
 
 CLI_TOOLSETS = _resolve_cli_toolsets()
 
+
+# Toolsets a per-session override may never remove. A session override is a way to *add*
+# MCP servers / optional toolsets for one conversation, not a way to strip the agent's hands.
+# Two incidents (a router plugin writing ["graft","linear","codebase-memory"], and users
+# picking MCP servers from the composer chip) left long sessions with only
+# tool_search/cronjob_manage — the model reported "no tools" and work stalled. Fail closed:
+# whatever the caller passes, the profile's core toolsets ride along.
+CORE_SESSION_TOOLSETS = ("terminal", "file", "delegation", "skills", "todo", "clarify")
+
+
+def merge_session_toolsets(profile_toolsets, override):
+    """Return the effective toolset list for a session.
+
+    ``override`` None/empty → ``profile_toolsets`` unchanged.
+    Otherwise → override entries, plus every ``CORE_SESSION_TOOLSETS`` entry that the
+    profile grants and the override omitted (appended, order preserved, de-duped). An
+    override can therefore only add to the profile's core surface, never shrink it.
+    """
+    profile_list = list(profile_toolsets or [])
+    if not override:
+        return profile_list
+    merged = []
+    seen = set()
+    for name in list(override) + [t for t in CORE_SESSION_TOOLSETS if t in profile_list]:
+        if isinstance(name, str) and name and name not in seen:
+            seen.add(name)
+            merged.append(name)
+    return merged
+
 # ── Model / provider discovery ───────────────────────────────────────────────
 
 # Hardcoded fallback models (used when no config.yaml or agent is available)

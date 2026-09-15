@@ -10611,11 +10611,15 @@ def _run_agent_streaming(
 
             # Per-profile toolsets — use _resolve_cli_toolsets() so MCP
             # server toolsets are included, matching native CLI behaviour.
-            from api.config import _resolve_cli_toolsets
-            _toolsets = _resolve_cli_toolsets(_cfg)
+            from api.config import _resolve_cli_toolsets, merge_session_toolsets
+            _profile_toolsets = _resolve_cli_toolsets(_cfg)
+            _toolsets = list(_profile_toolsets)
 
             # Per-session toolset override (#493): if the session has
-            # enabled_toolsets set, use that instead of the global config.
+            # enabled_toolsets set, it is merged ON TOP of the profile's core
+            # toolsets — an override adds MCP servers/optional toolsets, it can
+            # never strip terminal/file/delegation (fail closed, see
+            # api.config.merge_session_toolsets).
             try:
                 from api.models import Session, SESSION_DIR
                 _session_path = SESSION_DIR / f"{session_id}.json"
@@ -10629,7 +10633,11 @@ def _run_agent_streaming(
                     # (Opus pre-release advisor finding for v0.50.257.)
                     _override = getattr(_session_meta, 'enabled_toolsets', None) if _session_meta else None
                     if _override:
-                        _toolsets = _override
+                        _toolsets = merge_session_toolsets(_profile_toolsets, _override)
+                        _restored = [t for t in _toolsets if t not in _override]
+                        if _restored:
+                            print(f"[webui] session {session_id}: toolset override omitted core toolsets; "
+                                  f"restored {_restored}", flush=True)
             except Exception as _ts_err:
                 print(f"[webui] WARNING: failed to read per-session toolsets for {session_id}: {_ts_err}", flush=True)
 

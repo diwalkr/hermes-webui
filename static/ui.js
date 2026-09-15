@@ -5475,6 +5475,9 @@ document.addEventListener('click',function(e){
 // ── Session toolsets chip (#493) ───────────────────────────────────────────
 let _currentSessionToolsets = null; // null = active profile defaults, array = custom list
 let _toolsetsCatalog = null;
+// Mirror of api.config.CORE_SESSION_TOOLSETS — the server always merges these back into a
+// per-session override; the UI only uses this list to explain that to the user.
+const CORE_SESSION_TOOLSETS = ['terminal', 'file', 'delegation', 'skills', 'todo', 'clarify'];
 
 function _applyToolsetsChip(toolsets) {
   _currentSessionToolsets = toolsets;
@@ -5599,6 +5602,14 @@ function _renderToolsetsPresetSections(opts) {
   defaultsBtn.className = 'toolsets-action-btn toolsets-clear-btn';
   defaultsBtn.textContent = t('session_toolsets_use_profile_defaults');
   section.appendChild(defaultsBtn);
+
+  // An override is additive: the server merges core toolsets back in
+  // (api.config.merge_session_toolsets). Say so, so nobody reads the list
+  // above as "these are the ONLY tools the agent will have".
+  if (hasCustom) {
+    const missingCore = CORE_SESSION_TOOLSETS.filter(function(n) { return !selectedSet.has(n); });
+    if (missingCore.length) _appendToolsetsLabel(section, t('session_toolsets_core_note', missingCore.join(', ')));
+  }
 
   _appendToolsetsLabel(section, t('session_toolsets_configured_servers'));
   if (_toolsetsCatalog === null) {
